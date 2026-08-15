@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="index, follow" />
+<title>Raat 2 Baje — Der Ho Gayi Radio</title>
+<meta name="description" content="Rात 2 baje, haath mein gulaab, aur khidki ki roshni kisi aur ke liye. Der ho gayi wale gaane, non-stop." />
+<meta property="og:title" content="Raat 2 Baje — Der Ho Gayi Radio" />
+<meta property="og:description" content="2 AM. Der ho gayi. Haath mein sirf phool reh gaye." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink-black:#070a11;
+    --night-navy:#0d1522;
+    --lamp-amber:#f2a85c;
+    --window-warm:#f2a85c;
+    --rose-red:#9c3b3b;
+    --rose-bright:#c65a4a;
+    --paper:#f5ede2;
+    --paper-dim:rgba(245,237,226,0.66);
+    --dusk:#8d94a6;
+    --glass-bg:rgba(13,18,28,0.40);
+    --glass-border:rgba(245,237,226,0.18);
+    --glass-blur:20px;
+    --line-soft:rgba(245,237,226,0.18);   /* hairline / slider track */
+    --line-strong:rgba(245,237,226,0.32); /* hover borders            */
+
+    --font-display:'Rozha One', serif;
+    --font-serif:'Cormorant Garamond', serif;
+    --font-ui:'Manrope', sans-serif;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    height:100vh;
+    height:100dvh;
+    width:100vw;
+    overflow:hidden;
+    background:var(--ink-black);
+    font-family:var(--font-ui);
+    color:var(--paper);
+  }
+
+  /* ---------- STAGE ---------- */
+  .stage{
+    position:relative;
+    height:100vh;
+    height:100dvh; width:100vw;
+    overflow:hidden;
+  }
+
+  /* 3D-transformable scene layer (background + content).
+     The music player lives OUTSIDE this layer so it stays
+     fixed as a foreground HUD while the scene tilts. */
+  .scene-layer{
+    position:absolute; inset:0;
+    z-index:2;
+    will-change:transform;
+  }
+
+  .hero-bg{
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(180deg, rgba(5,7,12,0.62) 0%, rgba(5,7,12,0.06) 20%, rgba(5,7,12,0.02) 52%, rgba(5,7,12,0.66) 84%, rgba(4,5,9,0.94) 100%),
+      url('https://z-cdn-media.chatglm.cn/files/5d0d6245-4ebc-497e-a12a-a69b9a7aecd6.png?auth_key=1886799534-a62eb9f0f41c454ba89a867c48fb312f-0-c4bcda99c91d167ddbfd901eff5e3c92');
+    background-size:cover;
+    background-position:center 38%;
+    filter:saturate(1.02) contrast(1.02);
+    transform:scale(1.03);
+  }
+
+  .grain{
+    position:absolute; inset:0;
+    pointer-events:none;
+    opacity:0.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  /* ---------- TOP BAR ---------- */
+  .topbar{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:flex-end; align-items:flex-start;
+    padding:calc(18px + env(safe-area-inset-top)) 22px 0 22px;
+    z-index:5;
+  }
+
+  .clock{
+    font-size:14px; letter-spacing:0.08em; color:var(--paper-dim); font-weight:600;
+  }
+
+
+  .nav-links{
+    display:flex; gap:8px; align-items:flex-start;
+  }
+  .pill-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-ui); font-size:12.5px; font-weight:600;
+    color:var(--paper);
+    background:var(--glass-bg);
+    backdrop-filter:blur(var(--glass-blur));
+    -webkit-backdrop-filter:blur(var(--glass-blur));
+    border:1px solid var(--glass-border);
+    padding:9px 14px;
+    border-radius:999px;
+    text-decoration:none;
+    cursor:pointer;
+    letter-spacing:0.02em;
+    transition:transform 0.18s ease, border-color 0.18s ease;
+  }
+  .pill-btn:hover{ transform:translateY(-1px); border-color:var(--line-strong); }
+  .pill-btn:focus-visible{ outline:2px solid var(--window-warm); outline-offset:2px; }
+  .pill-btn svg{ width:14px; height:14px; flex-shrink:0; }
+
+  @media (max-width:640px){
+    .nav-links .label-full{ display:none; }
+    .pill-btn{ padding:9px 10px; }
+  }
+
+  /* ---------- WORDMARK ---------- */
+  .wordmark-zone{
+    position:absolute;
+    top:34%; left:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+    z-index:4;
+    width:min(90vw, 720px);
+  }
+
+  .status-row{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    margin-bottom:20px;
+    font-family:var(--font-ui);
+  }
+
+  .eyebrow{
+    font-family:var(--font-ui);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.46em;
+    color:var(--dusk);
+    text-transform:uppercase;
+    margin:0 0 14px 0;
+    padding-left:0.46em; /* visually recenters letterspaced caps */
+  }
+
+  opencode
+  @keyframes winGlow{
+    0%,100%{ box-shadow:inset 0 0 16px rgba(242,168,92,0.34), 0 0 26px 3px rgba(242,168,92,0.30); }
+    50%    { box-shadow:inset 0 0 20px rgba(242,168,92,0.46), 0 0 36px 7px rgba(242,168,92,0.42); }
+  }
+
+  .hindi-title{
+    font-family:var(--font-display);
+    font-size:clamp(50px, 9.5vw, 104px);
+    line-height:1.05;
+    margin:0;
+    color:var(--paper);
+    text-wrap:balance;
+    text-shadow:0 2px 30px rgba(0,0,0,0.6), 0 0 70px rgba(242,168,92,0.16);
+  }
+
+  .tagline{
+    font-family:var(--font-serif);
+    font-style:italic;
+    font-weight:500;
+    font-size:clamp(15px, 2.1vw, 19px);
+    color:var(--paper-dim);
+    margin:16px 0 0 0;
+    letter-spacing:0.01em;
+    text-wrap:balance;
+  }
+
+  /* radio frequency hairline — the station's call sign */
+  .freq{
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    margin-top:22px;
+    font-family:var(--font-ui);
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.34em;
+    text-transform:uppercase;
+    color:var(--dusk);
+    padding-left:0.34em;
+  }
+  .freq::before, .freq::after{
+    content:""; height:1px; flex:1; max-width:130px;
+    background:linear-gradient(to right, transparent, rgba(245,237,226,0.20));
+  }
+  .freq::after{ background:linear-gradient(to left, transparent, rgba(245,237,226,0.20)); }
+
+  @media (max-width:640px){
+    .wordmark-zone{ transform:translate(-50%,-50%); top:32%; }
+    .freq{ margin-top:16px; }
+  }
+
+  /* short/landscape screens: compact the identity so the centered
+     player always stays clear */
+  @media (max-height:540px){
+    .wordmark-zone{ top:25%; }
+    .window-lit{ display:none; }
+    .freq{ display:none; }
+    .hindi-title{ font-size:clamp(34px, 6.5vw, 56px); }
+    .eyebrow{ margin-bottom:10px; }
+    .tagline{ margin-top:10px; }
+  }
+
+  /* ---------- PLAYER BAR (liquid glass pill) ---------- */
+  .player-float{
+    position:absolute;
+    left:50%; top:70%;
+    transform:translate(-50%,-50%);
+    z-index:10;
+    transition:transform 0.4s cubic-bezier(.22,.9,.35,1);
+  }
+  .player-float:hover{ transform:translate(-50%, calc(-50% - 4px)); }
+
+  .player-bar{
+    position:relative;
+    width:min(92vw, 640px);
+
+    display:flex; align-items:center; gap:14px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04) 38%, rgba(255,255,255,0.08)),
+      var(--glass-bg);
+    backdrop-filter:blur(20px) saturate(170%);
+    -webkit-backdrop-filter:blur(20px) saturate(170%);
+    border:1px solid var(--glass-border);
+    border-radius:999px;
+    padding:12px 16px 12px 12px;
+    box-shadow:
+      0 22px 54px -12px rgba(0,0,0,0.55),
+      0 8px 20px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.20),
+      inset 0 -1px 0 rgba(0,0,0,0.28);
+    transition:box-shadow 0.4s ease, border-color 0.4s ease;
+  }
+
+  /* liquid-glass sheen reflection */
+  .player-bar::before{
+    content:""; position:absolute; inset:0; border-radius:inherit;
+    pointer-events:none;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0) 32%),
+      radial-gradient(130% 90% at 10% 0%, rgba(255,255,255,0.10), transparent 46%);
+  }
+
+  .player-float:hover .player-bar{
+    box-shadow:
+      0 30px 66px -14px rgba(0,0,0,0.62),
+      0 10px 24px rgba(0,0,0,0.38),
+      inset 0 1px 0 rgba(255,255,255,0.24),
+      inset 0 -1px 0 rgba(0,0,0,0.28);
+  }
+
+  .player-bar.playing{
+    border-color:rgba(242,168,92,0.40);
+    background:
+      linear-gradient(135deg, rgba(242,168,92,0.10), rgba(255,255,255,0.04) 38%, rgba(242,168,92,0.06)),
+      var(--glass-bg);
+    box-shadow:
+      0 22px 54px -12px rgba(0,0,0,0.55),
+      0 8px 20px rgba(0,0,0,0.35),
+      0 0 34px -6px rgba(242,168,92,0.30),
+      inset 0 1px 0 rgba(255,255,255,0.20),
+      inset 0 -1px 0 rgba(0,0,0,0.28);
+  }
+
+  .cover-thumb{
+    position:relative;
+    width:48px; height:48px; border-radius:50%;
+    flex-shrink:0; overflow:hidden;
+    background:
+      radial-gradient(circle at 32% 26%, rgba(255,214,150,0.9), transparent 32%),
+      radial-gradient(circle at 72% 80%, rgba(198,90,74,0.85), transparent 45%),
+      linear-gradient(150deg, var(--rose-red), var(--night-navy) 60%, #22102a);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.14),
+      inset 0 0 18px rgba(0,0,0,0.4),
+      0 10px 22px rgba(0,0,0,0.45);
+  }
+  /* vinyl groove ring */
+  .cover-thumb::before{
+    content:""; position:absolute; inset:8%; border-radius:50%;
+    border:1px solid rgba(255,255,255,0.10);
+    pointer-events:none;
+  }
+  /* glossy reflection */
+  .cover-thumb::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:linear-gradient(135deg, rgba(255,255,255,0.20), transparent 44%);
+    pointer-events:none;
+  }
+  .player-bar.playing .cover-thumb{ animation:spin 16s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .cover-thumb svg{ width:20px; height:20px; opacity:0.85; }
+  .cover-thumb img{
+    width:100%; height:100%;
+    object-fit:cover;
+    display:none;
+  }
+  .cover-thumb.has-cover img{ display:block; }
+  .cover-thumb.has-cover svg{ display:none; }
+
+  .track-meta{ min-width:0; width:150px; flex-shrink:0; }
+  .track-title{
+    font-size:13.5px; font-weight:700; color:var(--paper);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .track-artist{
+    font-size:11.5px; color:var(--paper-dim); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .transport{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .icon-btn{
+    background:none; border:none; color:var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    width:36px; height:36px; border-radius:50%;
+    cursor:pointer; opacity:0.88;
+    transition:opacity 0.15s ease, background 0.15s ease, transform 0.2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .icon-btn:hover{ opacity:1; background:var(--line-strong); }
+  .icon-btn:active{ transform:scale(0.88); }
+  .icon-btn:focus-visible{ outline:2px solid var(--window-warm); outline-offset:2px; }
+  .icon-btn svg{ width:16px; height:16px; }
+
+  .play-btn{
+    width:44px; height:44px;
+    background:var(--paper); color:var(--ink-black);
+    box-shadow:0 6px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.8);
+    transition:background 0.2s ease, box-shadow 0.25s ease;
+  }
+  .play-btn:hover{ background:var(--paper); opacity:1; box-shadow:0 9px 22px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.35); }
+  .play-btn svg{ width:16px; height:16px; }
+
+  .progress-wrap{
+    flex:1; min-width:0;
+    display:flex; align-items:center; gap:8px;
+  }
+  .time{
+    font-size:10.5px; color:var(--paper-dim); font-variant-numeric:tabular-nums;
+    flex-shrink:0; width:38px;
+  }
+  .time.dur{ text-align:right; }
+
+  .seek{
+    -webkit-appearance:none; appearance:none;
+    flex:1; min-width:30px; height:3px; border-radius:3px;
+    background-color:var(--line-soft);
+    background-image:linear-gradient(to right, var(--window-warm) var(--seek,0%), var(--line-soft) var(--seek,0%));
+    outline:none; cursor:pointer;
+    transition:height 0.2s ease;
+  }
+  .seek:hover{ height:5px; }
+  .seek:focus-visible{
+    outline:2px solid var(--window-warm);
+    outline-offset:4px;
+    height:5px;
+  }
+  .seek:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 5px rgba(242,168,92,0.40); }
+  .seek:focus-visible::-moz-range-thumb{ box-shadow:0 0 0 5px rgba(242,168,92,0.40); }
+  .seek::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:11px; height:11px; border-radius:50%;
+    background:var(--paper); cursor:pointer;
+    box-shadow:0 0 0 3px var(--line-strong);
+    transition:box-shadow 0.2s ease;
+  }
+  .seek:hover::-webkit-slider-thumb{ box-shadow:0 0 0 5px rgba(242,168,92,0.28); }
+  .seek::-moz-range-thumb{
+    width:11px; height:11px; border-radius:50%;
+    background:var(--paper); border:none; cursor:pointer;
+    box-shadow:0 0 0 3px var(--line-strong);
+  }
+  .seek:hover::-moz-range-thumb{ box-shadow:0 0 0 5px rgba(242,168,92,0.28); }
+
+  /* 700px (not 640): the desktop pill's fixed cover+meta+transport
+     overflow ~641–694px, so wrap early to avoid a dead zone */
+  @media (max-width:700px){
+    .player-float{ width:min(94vw, 640px); }
+    .player-bar{
+      width:100%;
+      flex-wrap:wrap;
+      padding:12px 14px 14px 14px;
+      border-radius:22px;
+      row-gap:8px;
+    }
+    .track-meta{ width:auto; flex:1; }
+    .icon-btn{ width:42px; height:42px; }
+    .progress-wrap{ order:5; width:100%; flex-basis:100%; }
+  }
+
+  /* ---------- FOOTER CREDIT ---------- */
+  .credit-line{
+    position:absolute;
+    bottom:4px; left:0; right:0;
+    text-align:center;
+    font-size:10px; color:rgba(245,237,226,0.52);
+    z-index:3;
+    letter-spacing:0.02em;
+    padding:0 12px;
+  }
+  .credit-line a{ color:rgba(245,237,226,0.72); }
+
+  @media (max-width:640px){ .credit-line{ display:none; } }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .cover-thumb{ animation:none !important; }
+    .window-lit{ animation:none !important; opacity:1; }
+    .player-float:hover{ transform:translate(-50%,-50%); }
+    .player-float, .player-bar, .icon-btn, .play-btn, .seek{ transition:none !important; }
+  }
+
+  #yt-hidden-player{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene-layer">
+    <div class="hero-bg" role="img" aria-label="A man stands alone on a rainy night street holding a bouquet of roses with petals scattered on the ground, looking up at a warmly lit window across the street."></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <nav class="nav-links" aria-label="External music links and site actions">
+      <a class="pill-btn" href="https://open.spotify.com" target="_blank" rel="noopener" aria-label="Listen on Spotify">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.4a.62.62 0 0 1-.86.2c-2.36-1.44-5.33-1.77-8.83-.97a.62.62 0 1 1-.28-1.22c3.83-.87 7.12-.5 9.77 1.12.3.18.4.57.2.87Zm1.22-2.72a.78.78 0 0 1-1.07.26c-2.7-1.66-6.82-2.14-10.02-1.17a.78.78 0 1 1-.46-1.5c3.66-1.11 8.2-.57 11.3 1.33.37.23.49.72.25 1.08Zm.11-2.84C14.98 9 9.06 8.8 5.6 9.86a.94.94 0 1 1-.55-1.8c3.98-1.21 10.5-.98 14.6 1.47a.94.94 0 0 1-.97 1.61Z"/></svg>
+        <span class="label-full">Spotify</span>
+      </a>
+      <a class="pill-btn" href="https://music.youtube.com" target="_blank" rel="noopener" aria-label="Listen on YouTube Music">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6" fill="var(--night-navy)"/><path d="M10.5 9.5v5l4.3-2.5-4.3-2.5Z" fill="currentColor"/></svg>
+        <span class="label-full">YT Music</span>
+      </a>
+      <button class="pill-btn" id="installBtn" style="display:none;" aria-label="Install Raat 2 Baje">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14"/></svg>
+        <span class="label-full">Install</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- WORDMARK -->
+  <div class="wordmark-zone">
+    <div class="status-row">
+      <div class="clock" id="clock">--:--</div>
+    </div>
+    <p class="eyebrow">Der Ho Gayi Radio</p>
+    <div class="window-lit" aria-hidden="true"></div>
+    <h1 class="hindi-title">रात 2 बजे</h1>
+    <p class="tagline">Gulaab haath mein reh gaya, mohabbat raaste mein</p>
+  </div>
+  </div>
+
+  <!-- PLAYER BAR -->
+  <div class="player-float">
+  <div class="player-bar" id="playerBar" role="region" aria-label="Music player">
+    <div class="cover-thumb" id="coverThumb">
+      <img id="coverImg" alt="" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--paper)" stroke-width="1.6" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>
+    </div>
+
+    <div class="track-meta">
+      <div class="track-title" id="trackTitle">Kitna Haseen Chehra</div>
+      <div class="track-artist" id="trackArtist">Ishtar Music</div>
+    </div>
+
+    <div class="transport">
+      <button class="icon-btn" id="prevBtn" aria-label="Previous track">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6L9 12l11 6V6z"/></svg>
+      </button>
+      <button class="icon-btn play-btn" id="playBtn" aria-label="Play music">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+      </button>
+      <button class="icon-btn" id="nextBtn" aria-label="Next track">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l11 6L4 18V6z"/></svg>
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <span class="time" id="curTime">0:00</span>
+      <input type="range" class="seek" id="seekBar" min="0" max="100" value="0" aria-label="Seek">
+      <span class="time dur" id="durTime">0:00</span>
+    </div>
+  </div>
+  </div>
+
+
+
+  <!-- OFFSCREEN YOUTUBE PLAYER -->
+  <div id="yt-hidden-player" aria-hidden="true"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="playlist.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

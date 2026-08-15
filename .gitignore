@@ -1,0 +1,8 @@
+# opencode tooling (not part of the project)
+.opencode/
+node_modules/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
