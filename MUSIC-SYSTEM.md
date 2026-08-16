@@ -73,7 +73,7 @@ window.PLAYLISTS = [
       // ...more tracks
     ]
   }
-  // ...more playlists (55 total, 451 tracks)
+  // ...more playlists (55 total, 550 tracks)
 ];
 ```
 
@@ -162,7 +162,27 @@ To add a song: copy a track object, put a real, embeddable video ID in
   (see `playCurrentTrack()`, `app.js:329`).
 - `onStateChange`: `ENDED → playNext()`, `PLAYING → setPlayingUI(true)`,
   `PAUSED → setPlayingUI(false)`.
-- `onError` (blocked/unavailable video) → `playNext()` automatically skips.
+- `onError` (blocked/unavailable video) → the ID is added to a session
+  `blockedIds` set, and playback slides to the next track after a short delay.
+  The random picker avoids blocked IDs, so a handful of broken uploads can't
+  make the radio stutter or skip-loop.
+
+### 5.4 Never-stop reliability
+
+The engine actively refuses to halt on a bad track:
+
+- **Failure blocklist** — any video that errors is remembered for the session
+  (`blockedIds`); `randomIndex()` only picks from IDs that haven't failed. If
+  everything is blocked it clears the set and uses the whole library.
+- **Start watchdog** — after `loadVideoById`, a 12 s timer checks the player
+  actually reaches a settled state. A video stuck in `UNSTARTED`/`BUFFERING`
+  is handed off to the next track instead of freezing the radio. It re-arms
+  itself while paused so a wedged video can't break a later play attempt.
+- **Frozen-clock detection** — the 1 s progress loop counts consecutive
+  seconds the clock doesn't move while the player claims `PLAYING`; after 20 s
+  it advances to the next track.
+- **Double-advance guard** — a `loadToken` + `skipScheduled` flag ensure a
+  single failure (which can fire multiple events) only advances once.
 
 ### 5.2 Fallback simulation (no YouTube = the UI still works)
 
@@ -188,11 +208,12 @@ Dragging the bar (or using ←/→ keys, or OS `seekto`) calls
 
 | Piece | How it connects |
 |---|---|
-| **Random next** | `playNext()` picks a non-repeating random index via `randomIndex()` from the flat `ALL_TRACKS`; `history` (capped at 50) records every auto-advance. |
+| **Random next** | `playNext()` picks a non-repeating random index via `randomIndex()` from the flat `ALL_TRACKS`, skipping any ID on the session failure blocklist; `history` (capped at 50) records every auto-advance. |
 | **Previous** | `playPrev()` pops the last entry from `history` so "prev" steps back through the random shuffle; falls back to the current track when empty. |
 | **Play / Pause / Prev / Next** | Buttons on `#playerBar` → `togglePlay()`, `playPrev()`, `playNext()`. |
 | **Media Session** | `navigator.mediaSession.metadata` = `{ title, artist, album: "Raat 2 Baje", artwork }` → **lock-screen / OS media controls** (play, pause, next, prev, seek) on phones & desktop. |
 | **Keyboard** | `Space` = play/pause, `←`/`→` = seek ∓5 s. |
+| **Library browser** | `#libraryBtn` (top bar) opens a glass modal (`#libraryModal`) listing **every track in one flat list** — search filters by title/artist; clicking a row (or pressing Enter in the search) plays that song, and Next keeps playing randomly from there. `Esc`, backdrop click, or ✕ closes it. Exact duplicate tracks (same title + artist + video) are dropped at flatten time. |
 | **Clock & listener counter** | `#clock` (real local time) and `#onlineCount` (simulated, drifts ±3 around 214 every 4 s). |
 | **Motion layer** | GSAP entrance fades, pointer parallax drift on `.hero-bg`/`.grain`/`.wordmark-zone`/`.topbar` (fine pointers only), play/pause pulse on the cover, and the `.window-lit` glow that class-toggles `lit` (breathing light) while a track plays. All gated by `prefers-reduced-motion`. |
 

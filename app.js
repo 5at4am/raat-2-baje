@@ -125,16 +125,32 @@
   let progressTimer = null;
   let fallbackTimer = null;
 
+  /* reliability: keep playback moving no matter what a single track does */
+  let loadToken = 0;            /* bumped on every load; guards double-advance */
+  let skipScheduled = false;    /* prevents one failure from advancing twice   */
+  let loadPending = false;      /* a new video is loading; ignore stray PAUSED */
+  let stallTimer = null;        /* watchdog: video never starts -> auto-next   */
+  let lastProgressAt = 0;       /* last getCurrentTime() while PLAYING         */
+  let frozenCount = 0;          /* consecutive seconds the clock didn't move   */
+  const blockedIds = new Set(); /* youtubeIds that failed to play this session */
+
   /* fallback simulated playback so the UI/demo still works
      when the YouTube API can't load (offline preview, blocked network) */
   let simTime = 0;
   let simDuration = 245;
   let usingFallback = false;
 
-  /* one flat library: every track from every playlist */
+  /* one flat library: every track from every playlist, no categories.
+     Exact duplicates (same title, artist, and video) are dropped. */
   const ALL_TRACKS = [];
   PLAYLISTS.forEach((pl) => {
-    pl.tracks.forEach((t) => { ALL_TRACKS.push({ track: t }); });
+    pl.tracks.forEach((t) => {
+      if(ALL_TRACKS.some((e) =>
+        e.track.title === t.title &&
+        e.track.artist === t.artist &&
+        e.track.youtubeId === t.youtubeId)) return;
+      ALL_TRACKS.push({ track: t });
+    });
   });
 
   /* history of played tracks so "previous" steps back through random */
@@ -190,6 +206,84 @@
     deferredPrompt = null;
     el('installBtn').style.display = 'none';
   });
+
+  /* ============ LIBRARY (browse / search / play any song) ============ */
+  const libraryModal = el('libraryModal');
+  const libraryClose = el('libraryClose');
+  const librarySearch = el('librarySearch');
+  const songListEl = el('songList');
+  const libraryCount = el('libraryCount');
+
+  function openLibrary(){
+    libraryModal.classList.add('open');
+    librarySearch.value = '';
+    renderLibrary('');
+    librarySearch.focus();
+  }
+  function closeLibrary(){
+    libraryModal.classList.remove('open');
+  }
+  function renderLibrary(filter){
+    const q = filter.trim().toLowerCase();
+    const matches = ALL_TRACKS.map((e, i) => ({ entry: e, i }))
+      .filter(({ entry }) => !q ||
+        entry.track.title.toLowerCase().includes(q) ||
+        entry.track.artist.toLowerCase().includes(q));
+    libraryCount.textContent = q
+      ? `${matches.length} / ${ALL_TRACKS.length} songs`
+      : `${ALL_TRACKS.length} songs`;
+    songListEl.textContent = '';
+    const frag = document.createDocumentFragment();
+    matches.forEach(({ entry, i }) => {
+      const li = document.createElement('li');
+      li.className = 'song-row' + (i === currentFlatIndex ? ' now-playing' : '');
+      li.dataset.index = i;
+
+      const num = document.createElement('span');
+      num.className = 'song-num';
+      num.textContent = String(i + 1).padStart(3, '0');
+
+      const meta = document.createElement('span');
+      meta.className = 'song-meta';
+      const title = document.createElement('span');
+      title.className = 'song-title';
+      title.textContent = entry.track.title;
+      const artist = document.createElement('span');
+      artist.className = 'song-artist';
+      artist.textContent = entry.track.artist;
+      meta.append(title, artist);
+
+      li.append(num, meta);
+      frag.appendChild(li);
+    });
+    songListEl.appendChild(frag);
+  }
+
+  function playTrackAt(index){
+    currentFlatIndex = index;
+    playCurrentTrack();
+    if(ytReady && ytPlayer && ytPlayer.playVideo){
+      ytPlayer.unMute();
+      ytPlayer.playVideo();
+      startProgressLoop();
+    }
+    closeLibrary();
+  }
+
+  libraryModal.addEventListener('click', (e) => { if(e.target === libraryModal) closeLibrary(); });
+  libraryClose.addEventListener('click', closeLibrary);
+  librarySearch.addEventListener('input', () => renderLibrary(librarySearch.value));
+  librarySearch.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      const first = songListEl.querySelector('li[data-index]');
+      if(first) playTrackAt(parseInt(first.dataset.index, 10));
+    }
+  });
+  songListEl.addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-index]');
+    if(li) playTrackAt(parseInt(li.dataset.index, 10));
+  });
+  el('libraryBtn').addEventListener('click', openLibrary);
 
   /* ============ FORMAT TIME ============ */
   function fmt(sec){
@@ -284,18 +378,67 @@
           if(ytPlayer.unMute) ytPlayer.unMute();
           // if the user started playback while we were still in fallback,
           // hand off to the real audio source now
-          if(isPlaying){ ytPlayer.loadVideoById(currentEntry().track.youtubeId); }
+          if(isPlaying){ loadCurrentIntoPlayer(); }
         },
         onStateChange: onPlayerStateChange,
-        onError: () => { playNext(); }
+        onError: () => { advanceAfterFailure(currentEntry().track.youtubeId, true); }
       }
     });
   };
 
+  /* load the current track into the (ready) YouTube player and arm the
+     "did it actually start?" watchdog so a stuck video can't freeze the radio */
+  function loadCurrentIntoPlayer(){
+    const token = ++loadToken;
+    skipScheduled = false;
+    loadPending = true;
+    clearTimeout(stallTimer);
+    ytPlayer.loadVideoById(currentEntry().track.youtubeId);
+    armStallWatchdog(token);
+  }
+
+  /* watchdog: if a track is expected to play but never reaches a settled
+     state, hand off to the next one. While the user is paused it just
+     re-arms itself so a wedged video can't break a later play attempt. */
+  function armStallWatchdog(token){
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => {
+      if(token !== loadToken) return;      // a newer load already replaced this one
+      if(!isPlaying){ armStallWatchdog(token); return; }
+      const st = ytPlayer && ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+      if(st !== YT.PlayerState.PLAYING && st !== YT.PlayerState.PAUSED){
+        advanceAfterFailure(currentEntry().track.youtubeId, false);
+      }
+    }, 12000);
+  }
+
+  /* a track failed to start (or froze): remember the bad ID for this session,
+     keep the "playing" look, and slide to the next track on a short delay */
+  function advanceAfterFailure(id, permanent){
+    if(permanent && id) blockedIds.add(id);
+    loadToken++;                       /* invalidate the old load's watchdog   */
+    clearTimeout(stallTimer);
+    if(skipScheduled) return;          /* already advancing — don't double-skip */
+    skipScheduled = true;
+    setPlayingUI(true);
+    stallTimer = setTimeout(() => {
+      skipScheduled = false;
+      playNext();
+    }, 700);
+  }
+
   function onPlayerStateChange(evt){
-    if(evt.data === YT.PlayerState.ENDED){ playNext(); }
-    if(evt.data === YT.PlayerState.PLAYING){ setPlayingUI(true); startProgressLoop(); }
-    if(evt.data === YT.PlayerState.PAUSED){ setPlayingUI(false); }
+    if(evt.data === YT.PlayerState.PLAYING){
+      loadPending = false;
+      clearTimeout(stallTimer);
+      setPlayingUI(true);
+      startProgressLoop();
+    } else if(evt.data === YT.PlayerState.PAUSED){
+      if(loadPending) return;   /* transient pause while a new video loads */
+      setPlayingUI(false);
+    } else if(evt.data === YT.PlayerState.ENDED){
+      playNext();
+    }
   }
 
   function enableFallbackMode(){
@@ -306,6 +449,7 @@
   /* ============ PROGRESS LOOP ============ */
   function startProgressLoop(){
     clearInterval(progressTimer);
+    frozenCount = 0;
     progressTimer = setInterval(() => {
       if(!isPlaying) return;
 
@@ -313,6 +457,19 @@
       if(!usingFallback && ytPlayer && ytPlayer.getCurrentTime){
         cur = ytPlayer.getCurrentTime();
         dur = ytPlayer.getDuration() || simDuration;
+
+        /* stuck-playing detection: state says PLAYING but the clock never
+           moves -> the audio is wedged, so hand off to the next track */
+        if(ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING){
+          if(Math.abs(cur - lastProgressAt) < 0.001){ frozenCount++; }
+          else { frozenCount = 0; }
+          if(frozenCount >= 20){
+            frozenCount = 0;
+            advanceAfterFailure(currentEntry().track.youtubeId, false);
+            return;
+          }
+          lastProgressAt = cur;
+        }
       } else {
         simTime += 1;
         if(simTime >= simDuration) { playNext(); return; }
@@ -345,13 +502,14 @@
     renderTrackMeta();
     if(window.__playerUI) window.__playerUI.swapMeta();
     simTime = 0;
+    lastProgressAt = 0;
+    frozenCount = 0;
     el('seekBar').value = 0;
     el('seekBar').style.setProperty('--seek', '0%');
     el('curTime').textContent = '0:00';
 
     if(ytReady && ytPlayer && ytPlayer.loadVideoById){
-      const track = currentEntry().track;
-      ytPlayer.loadVideoById(track.youtubeId);
+      loadCurrentIntoPlayer();
     } else {
       setPlayingUI(true);
       startProgressLoop();
@@ -370,13 +528,20 @@
   }
   el('playBtn').addEventListener('click', togglePlay);
 
-  /* next is always random (never repeats the current track);
-     previous steps back through the recent history */
+  /* next is always random (never repeats the current track) and steers clear
+     of any video that failed to play this session, so broken uploads can't
+     make the radio stutter; previous steps back through the recent history */
   function randomIndex(){
     if(ALL_TRACKS.length < 2) return 0;
-    let idx;
-    do { idx = Math.floor(Math.random() * ALL_TRACKS.length); } while(idx === currentFlatIndex);
-    return idx;
+    let pool = ALL_TRACKS
+      .map((e, i) => i)
+      .filter(i => i !== currentFlatIndex && !blockedIds.has(ALL_TRACKS[i].track.youtubeId));
+    if(!pool.length){
+      // everything is blocked right now → forget failures and use the whole library
+      blockedIds.clear();
+      pool = ALL_TRACKS.map((e, i) => i).filter(i => i !== currentFlatIndex);
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   function playNext(){
@@ -427,6 +592,7 @@
   }
 
   document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && libraryModal.classList.contains('open')){ closeLibrary(); return; }
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
     if(e.key === ' ' || e.code === 'Space'){

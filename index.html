@@ -151,11 +151,7 @@
     padding-left:0.46em; /* visually recenters letterspaced caps */
   }
 
-  opencode
-  @keyframes winGlow{
-    0%,100%{ box-shadow:inset 0 0 16px rgba(242,168,92,0.34), 0 0 26px 3px rgba(242,168,92,0.30); }
-    50%    { box-shadow:inset 0 0 20px rgba(242,168,92,0.46), 0 0 36px 7px rgba(242,168,92,0.42); }
-  }
+  
 
   .hindi-title{
     font-family:var(--font-display);
@@ -418,11 +414,123 @@
     overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
 
+  /* ---------- LIVE COUNTER (top bar) ---------- */
+  .online-count{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:10.5px; font-weight:600; letter-spacing:0.06em;
+    color:var(--paper-dim);
+    background:var(--glass-bg);
+    border:1px solid var(--glass-border);
+    backdrop-filter:blur(var(--glass-blur));
+    -webkit-backdrop-filter:blur(var(--glass-blur));
+    padding:4px 10px;
+    border-radius:999px;
+  }
+  .online-count::before{
+    content:""; width:6px; height:6px; border-radius:50%;
+    background:#5dd67a;
+    box-shadow:0 0 8px rgba(93,214,122,0.8);
+  }
+
+  /* ---------- LIBRARY (browse any song) ---------- */
+  .library-modal{
+    position:fixed; inset:0; z-index:20;
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+    background:rgba(4,6,10,0.55);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    opacity:0; visibility:hidden;
+    transition:opacity 0.25s ease, visibility 0.25s ease;
+  }
+  .library-modal.open{ opacity:1; visibility:visible; }
+  .library-panel{
+    width:min(640px, 94vw);
+    max-height:min(76vh, 640px);
+    display:flex; flex-direction:column;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.06)),
+      rgba(10,14,22,0.92);
+    border:1px solid var(--glass-border);
+    border-radius:22px;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.12);
+    overflow:hidden;
+    transform:translateY(12px) scale(0.98);
+    transition:transform 0.25s cubic-bezier(.22,.9,.35,1);
+  }
+  .library-modal.open .library-panel{ transform:translateY(0) scale(1); }
+  .library-head{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    padding:18px 20px 12px;
+  }
+  .library-title{
+    font-family:var(--font-display);
+    font-size:20px; margin:0; color:var(--paper);
+    letter-spacing:0.02em;
+  }
+  .library-count{
+    font-family:var(--font-ui);
+    font-size:10.5px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--dusk); margin-top:4px;
+  }
+  .library-close{ width:36px; height:36px; flex-shrink:0; }
+  .library-search{
+    margin:0 20px 12px;
+    font-family:var(--font-ui); font-size:13.5px;
+    color:var(--paper);
+    background:var(--glass-bg);
+    border:1px solid var(--glass-border);
+    border-radius:999px;
+    padding:10px 16px;
+    outline:none;
+    transition:border-color 0.2s ease;
+  }
+  .library-search::placeholder{ color:var(--dusk); }
+  .library-search:focus{ border-color:var(--window-warm); }
+  .song-list{
+    list-style:none; margin:0; padding:0 10px 12px;
+    overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(245,237,226,0.25) transparent;
+  }
+  .song-row{
+    display:flex; align-items:center; gap:14px;
+    padding:9px 12px;
+    border-radius:12px;
+    cursor:pointer;
+    user-select:none;
+    transition:background 0.15s ease;
+  }
+  .song-row:hover{ background:rgba(245,237,226,0.06); }
+  .song-row:focus-visible{ outline:2px solid var(--window-warm); outline-offset:-2px; }
+  .song-num{
+    font-size:11px; font-variant-numeric:tabular-nums;
+    color:var(--dusk); flex-shrink:0; width:32px; text-align:right;
+  }
+  .song-meta{ min-width:0; flex:1; display:flex; flex-direction:column; }
+  .song-title{
+    font-size:13.5px; font-weight:600; color:var(--paper);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .song-artist{
+    font-size:11px; color:var(--paper-dim); margin-top:2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .song-row.now-playing .song-num{ color:var(--window-warm); }
+  .song-row.now-playing .song-title{ color:var(--window-warm); }
+  .song-row.now-playing::before{
+    content:""; width:6px; height:6px; border-radius:50%;
+    background:var(--window-warm);
+    box-shadow:0 0 8px rgba(242,168,92,0.8);
+    flex-shrink:0;
+  }
+
   @media (prefers-reduced-motion: reduce){
     .cover-thumb{ animation:none !important; }
     .window-lit{ animation:none !important; opacity:1; }
     .player-float:hover{ transform:translate(-50%,-50%); }
     .player-float, .player-bar, .icon-btn, .play-btn, .seek{ transition:none !important; }
+    .library-modal, .library-panel{ transition:none !important; }
   }
 
   #yt-hidden-player{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
@@ -438,6 +546,10 @@
     <!-- TOP BAR -->
     <header class="topbar">
       <nav class="nav-links" aria-label="External music links and site actions">
+      <button class="pill-btn" id="libraryBtn" aria-label="Browse all songs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <span class="label-full">Library</span>
+      </button>
       <a class="pill-btn" href="https://open.spotify.com" target="_blank" rel="noopener" aria-label="Listen on Spotify">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.4a.62.62 0 0 1-.86.2c-2.36-1.44-5.33-1.77-8.83-.97a.62.62 0 1 1-.28-1.22c3.83-.87 7.12-.5 9.77 1.12.3.18.4.57.2.87Zm1.22-2.72a.78.78 0 0 1-1.07.26c-2.7-1.66-6.82-2.14-10.02-1.17a.78.78 0 1 1-.46-1.5c3.66-1.11 8.2-.57 11.3 1.33.37.23.49.72.25 1.08Zm.11-2.84C14.98 9 9.06 8.8 5.6 9.86a.94.94 0 1 1-.55-1.8c3.98-1.21 10.5-.98 14.6 1.47a.94.94 0 0 1-.97 1.61Z"/></svg>
         <span class="label-full">Spotify</span>
@@ -457,6 +569,7 @@
   <div class="wordmark-zone">
     <div class="status-row">
       <div class="clock" id="clock">--:--</div>
+      <div class="online-count" id="onlineCount">214</div>
     </div>
     <p class="eyebrow">Der Ho Gayi Radio</p>
     <div class="window-lit" aria-hidden="true"></div>
@@ -500,6 +613,23 @@
   </div>
 
 
+
+  <!-- LIBRARY (browse any song) -->
+  <div class="library-modal" id="libraryModal" role="dialog" aria-modal="true" aria-label="Song library">
+    <div class="library-panel">
+      <header class="library-head">
+        <div>
+          <h2 class="library-title">Raat 2 Baje</h2>
+          <div class="library-count" id="libraryCount">—</div>
+        </div>
+        <button class="icon-btn library-close" id="libraryClose" aria-label="Close library">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <input type="search" class="library-search" id="librarySearch" placeholder="Search songs or artists…" aria-label="Search songs">
+      <ul class="song-list" id="songList"></ul>
+    </div>
+  </div>
 
   <!-- OFFSCREEN YOUTUBE PLAYER -->
   <div id="yt-hidden-player" aria-hidden="true"></div>
