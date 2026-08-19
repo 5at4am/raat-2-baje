@@ -153,6 +153,39 @@
 
   
 
+  /* the warmly-lit window across the street — breathes while a track plays */
+  .window-lit{
+    display:block;
+    width:54px; height:40px;
+    margin:0 auto 18px;
+    border-radius:8px;
+    position:relative;
+    background:
+      linear-gradient(180deg, rgba(255,224,168,0.92), rgba(242,168,92,0.55) 70%, rgba(198,90,74,0.32));
+    border:1px solid rgba(255,221,160,0.55);
+    box-shadow:
+      0 0 16px 1px rgba(242,168,92,0.22),
+      inset 0 0 14px rgba(255,233,196,0.55);
+    opacity:0.5;
+    transform:translateY(2px);
+    transition:opacity 0.9s ease, box-shadow 0.9s ease, transform 0.9s ease;
+  }
+  .window-lit::before{
+    content:""; position:absolute; inset:0; border-radius:inherit;
+    background:
+      linear-gradient(to right, transparent calc(50% - 1px), rgba(13,18,28,0.55) 50%, transparent calc(50% + 1px)),
+      linear-gradient(to bottom, transparent calc(50% - 1px), rgba(13,18,28,0.55) 50%, transparent calc(50% + 1px));
+  }
+  .window-lit.lit{
+    opacity:1;
+    transform:translateY(0);
+    animation:window-breathe 4.6s ease-in-out infinite;
+  }
+  @keyframes window-breathe{
+    0%,100%{ box-shadow:0 0 16px 2px rgba(242,168,92,0.30), inset 0 0 14px rgba(255,233,196,0.6); }
+    50%    { box-shadow:0 0 34px 7px rgba(242,168,92,0.55), inset 0 0 20px rgba(255,233,196,0.9); }
+  }
+
   .hindi-title{
     font-family:var(--font-display);
     font-size:clamp(50px, 9.5vw, 104px);
