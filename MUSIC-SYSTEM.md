@@ -73,7 +73,7 @@ window.PLAYLISTS = [
       // ...more tracks
     ]
   }
-  // ...more playlists (55 total, 550 tracks)
+  // ...more playlists (55 total, 508 tracks)
 ];
 ```
 

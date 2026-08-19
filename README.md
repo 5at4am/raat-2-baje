@@ -7,7 +7,7 @@ no build step, no framework, no bundler. Open `index.html` and it just plays.
 
 ## Features
 
-- **550 tracks across 55 playlists** — the Emraan Hashmi film discography plus
+- **508 tracks across 55 playlists** — the Emraan Hashmi film discography plus
   10 featured artists (Hamari Adhuri Kahani, Murder, Raja Natwarlal, …).
 - **YouTube-powered audio** — a hidden 1×1 IFrame player streams every track
   via the public YouTube IFrame Player API. Every video ID was verified
