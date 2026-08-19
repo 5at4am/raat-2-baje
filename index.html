@@ -578,11 +578,18 @@
     background:var(--window-warm);
     box-shadow:0 0 8px rgba(242,168,92,0.8);
     flex-shrink:0;
+    animation:live-dot 1.6s ease-in-out infinite;
+  }
+  @keyframes live-dot{
+    0%,100%{ transform:scale(1); opacity:1; }
+    50%    { transform:scale(1.5); opacity:0.55; }
   }
 
   @media (prefers-reduced-motion: reduce){
     .cover-thumb{ animation:none !important; }
     .window-lit{ animation:none !important; opacity:1; }
+    .eq i{ animation:none !important; transform:scaleY(0.7); }
+    .song-row.now-playing::before{ animation:none !important; }
     .player-float:hover{ transform:translate(-50%,-50%); }
     .player-float, .player-bar, .icon-btn, .play-btn, .seek{ transition:none !important; }
     .library-modal, .library-panel{ transition:none !important; }
