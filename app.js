@@ -134,6 +134,23 @@
   let frozenCount = 0;          /* consecutive seconds the clock didn't move   */
   const blockedIds = new Set(); /* youtubeIds that failed to play this session */
 
+  /* persistent skip log: records songs that actually failed to start in THIS
+     browser (real ground truth — automation can't reproduce ad serving, so
+     only failures observed here are worth removing). Loaded on boot so a
+     future run can avoid re-testing the same dead songs. */
+  const SKIP_LOG_KEY = 'raat2baje_skips';
+  let skipLog = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(SKIP_LOG_KEY) || '[]');
+    if(Array.isArray(saved)) skipLog = saved.filter((e) => e && e.id);
+  } catch (e) { /* storage unavailable */ }
+  const logSkip = (id) => {
+    if(!id || skipLog.some((e) => e.id === id)) return;
+    skipLog.push({ id, title: (currentEntry() || {}).track ? currentEntry().track.title : '', at: Date.now() });
+    if(skipLog.length > 200) skipLog = skipLog.slice(-200);
+    try { localStorage.setItem(SKIP_LOG_KEY, JSON.stringify(skipLog)); } catch (e) { /* ignore */ }
+  };
+
   /* fallback simulated playback so the UI/demo still works
      when the YouTube API can't load (offline preview, blocked network) */
   let simTime = 0;
@@ -415,7 +432,10 @@
   /* a track failed to start (or froze): remember the bad ID for this session,
      keep the "playing" look, and slide to the next track on a short delay */
   function advanceAfterFailure(id, permanent){
-    if(permanent && id) blockedIds.add(id);
+    if(permanent && id){
+      blockedIds.add(id);
+      logSkip(id);
+    }
     loadToken++;                       /* invalidate the old load's watchdog   */
     clearTimeout(stallTimer);
     if(skipScheduled) return;          /* already advancing — don't double-skip */
